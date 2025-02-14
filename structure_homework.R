@@ -37,8 +37,8 @@ load("rs_data.RData")
 # In the viewer, take a look at the merge...what kinds of problems are there?
 # Why did some of the artist-song fail to match up?
 
-#ANSWER
-
+rs_joined_orig <- full_join(rs_old, rs_new, by = c("Artist", "Song"))
+nrow(rs_joined_orig)
 
 
 ### Question 2 ---------- 
@@ -49,7 +49,9 @@ load("rs_data.RData")
 # You will run into a problem because the old dataset has rank/year as characters instead of integers
 # Make Rank and Year into integer variables for rs_old before binding them into rs_all
 
-#ANSWER
+rs_old <- rs_old %>% mutate(Rank = as.integer(Rank), Year = as.integer(Year), Source = "Old")
+rs_new <- rs_new %>% mutate(Source = "New")
+rs_all <- bind_rows(rs_new, rs_old)
 
 
 ### Question 3 ----------
@@ -61,7 +63,14 @@ load("rs_data.RData")
 # Finally, read the documentation for the functions str_to_lower and str_trim
 # Use both functions to make all artists/song lowercase and remove any extra spaces
 
-#ANSWER
+rs_all <- rs_all %>% mutate(Artist = str_remove_all(Artist, "The"),
+                            Artist = str_replace_all(Artist, "&", "and"),
+                            Artist = str_remove_all(Artist, "[:punct:]"),
+                            Artist = str_to_lower(str_trim(Artist)))
+rs_all <- rs_all %>% mutate(Song = str_remove_all(Song, "The"),
+                            Song = str_replace_all(Song, "&", "and"),
+                            Song = str_remove_all(Song, "[:punct:]"),
+                            Song = str_to_lower(str_trim(Song)))
 
 
 ### Question 4 ----------
@@ -74,7 +83,10 @@ load("rs_data.RData")
 # Did the string cleaning improve matches? If so, there should be fewer rows of data (fewer duplicates)
 # in the new rs_joined compared to the original. Use nrow to check (there should be 799 rows)
 
-#ANSWER
+d_new <- rs_all %>% filter(Source == "New")
+d_old <- rs_all %>% filter(Source == "Old")
+rs_joined <- full_join(d_old, d_new, by = c("Artist", "Song"), suffix = c("_Old", "_New"))
+nrow(rs_joined)
 
 
 ### Question 5 ----------
@@ -101,7 +113,6 @@ load("rs_data.RData")
 #ANSWER
 
 
-
 ### Question 7 ----------
 
 # Use fct_count to see the number of songs within each decade
@@ -109,8 +120,7 @@ load("rs_data.RData")
 # Do fct_count on the lumped factor with the prop argument to see the 
 # proportion of songs in each of the top three decades (vs. all the rest)
 
-#ANSWER
-
+#ANSWER 
 
 
 ### Question 8 ---------- 
@@ -119,7 +129,8 @@ load("rs_data.RData")
 # Release_Date isn't read in correctly as a date
 # Use parse_date_time to fix it
 
-#ANSWER
+top20 <- read_csv("top_20.csv")
+top20 <- top20 %>% mutate(Release_Date = parse_date_time(Release, "%d-%b-%Y"))
 
 
 ### Question 9 --------
@@ -128,8 +139,7 @@ load("rs_data.RData")
 # use pivot_wider to fix the issue so that bpm and key are columns
 # overwrite top20 with the pivoted data (there should now be 20 rows!)
 
-#ANSWER
-
+top20 <- top20 %>% pivot_wider(names_from = "Style", values_from = "Value")
 
 
 ### Question 10 ---------
@@ -142,8 +152,14 @@ load("rs_data.RData")
 # Create a new factor called "season" that collapses each set of 3 months into a season "Winter", "Spring", etc.
 # Count the number of songs that were released in each season
 
-#ANSWER
-
+top20 <- top20 %>% left_join(rs_joined, by = c("Artist", "Song"))
+top20 <- top20 %>% mutate(Release_Month = month(Release_Date, label = TRUE),
+                          Season = fct_collapse(Release_Month,
+                                                Winter = c("Dec", "Jan", "Feb"),
+                                                Spring = c("Mar", "Apr", "May"),
+                                                Summer = c("Jun", "Jul", "Aug"),
+                                                Fall = c("Sep", "Oct", "Nov")))
+fct_count(top20$Season)
 
 
 ### Question 11 ---------
@@ -153,7 +169,6 @@ load("rs_data.RData")
 # Minor keys contain the lowercase letter "m". If there's no "m", it's Major
 # Figure out which is the top-ranked song (from Rank_New) that used a minor key
 
-#ANSWER
-
-
+top20 <- top20 %>% mutate(Quality = factor(ifelse(str_detect(Key, "m"), "Minor", "Major")))
+top20 <- top20 %>% filter(Quality == "Minor") %>% slice_min(Rank_New)
 
